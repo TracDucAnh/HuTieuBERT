@@ -1,0 +1,7 @@
+py_vncorenlp
+torch
+transformers
+numpy
+huggingface_hub
+matplotlib
+seaborn
