@@ -19,7 +19,15 @@ The design is portable to other isolating languages like Mandarin Chinese, consi
 
 **Subword Alignment:**
 
-- Syncing Labels: This step aligns word-structure tags (BMES) with the smaller sub-units of text created during tokenization.
+- Syncing Labels: This step aligns word-structure tags (BMES) with the smaller sub-units of text created during tokenization:
+
+    - B (Begin): Marks the first syllable or character of a multi-syllable word.
+
+    - M (Middle): Applied to the internal syllables or characters of a multi-syllable word.
+
+    - E (End): Marks the final syllable or character of a multi-syllable word.
+
+    - S (Single): Used for standalone words that consist of only one syllable or character. 
 
 - Maintaining Structure: By expanding these tags, the model ensures that multi-syllable words keep their linguistic meaning even when broken into pieces.
 
@@ -35,7 +43,7 @@ The design is portable to other isolating languages like Mandarin Chinese, consi
 
 ![Adaptive Boundary-Token Fusion](/figures/embeddings.png)
 
-## Morpheme-Aware Attention Bias.
+## Morpheme-Aware Attention Bias
 
 This module guides the model's focus by injecting a fixed structural prior into the early self-attention layers. It ensures that the "attention" mass respects the natural boundaries of compounds rather than spreading too thin across unrelated words.
 
