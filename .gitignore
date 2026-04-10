@@ -1,0 +1,4 @@
+# pycache
+__pycache__/
+model/__pycache__/
+vncorenlp/

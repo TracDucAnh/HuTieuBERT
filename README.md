@@ -82,6 +82,28 @@ By reweighting these connections, the model maintains a stable internal geometry
 
 ![Chi](/figures/machinesebert_attention_1-2_all.png)
 
+## Before Running the Code
+
+HuTieuBERT depends on **VnCoreNLP** for Vietnamese word segmentation. Before running any tokenizer or model example in this repository, please download and set up VnCoreNLP following the official repository: [vncorenlp/VnCoreNLP](https://github.com/vncorenlp/VnCoreNLP).
+
+Recommended setup:
+
+```bash
+pip install py_vncorenlp
+```
+
+```python
+import py_vncorenlp
+
+py_vncorenlp.download_model(save_dir="/absolute/path/to/vncorenlp")
+```
+
+Notes:
+
+- Java 1.8 or newer is required by VnCoreNLP.
+- Set `vncorenlp_dir` to the same directory you used in `download_model(...)`.
+- The camera-ready paper is not available yet; we will update the README with the final publication details after the conference.
+
 ## Example Usage
 
 ```python
