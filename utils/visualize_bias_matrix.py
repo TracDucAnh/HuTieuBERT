@@ -6,17 +6,18 @@ import numpy as np
 def visualize_bias_matrix(bias_matrix, encoded=None, tokenizer=None, tokens=None, title="Bias Matrix Visualization"):
     """
     Args:
-        bias_matrix: torch.Tensor, shape [seq_len, seq_len] hoặc [1, num_heads, seq_len, seq_len]
-        encoded: dict từ tokenizer, chứa 'input_ids' (tùy chọn)
-        tokenizer: tokenizer dùng để convert input_ids sang token (tùy chọn)
-        tokens: list[str], nhãn token nếu muốn tự truyền
-        title: tiêu đề heatmap
+        bias_matrix: torch.Tensor with shape [seq_len, seq_len] or
+            [1, num_heads, seq_len, seq_len]
+        encoded: tokenizer output dict containing 'input_ids' (optional)
+        tokenizer: tokenizer used to convert input_ids back to tokens (optional)
+        tokens: list[str], custom token labels if provided directly
+        title: heatmap title
     """
-    # Nếu bias_matrix là 4D -> [1, num_heads, seq_len, seq_len]
+    # If bias_matrix is 4D, interpret it as [1, num_heads, seq_len, seq_len]
     if isinstance(bias_matrix, torch.Tensor):
         bias_matrix = bias_matrix.detach().cpu()
         if bias_matrix.ndim == 4:
-            # trung bình trên head
+            # Average across attention heads
             bias_matrix = bias_matrix.mean(dim=1).squeeze(0)
         elif bias_matrix.ndim == 3:
             bias_matrix = bias_matrix.squeeze(0)
@@ -24,12 +25,12 @@ def visualize_bias_matrix(bias_matrix, encoded=None, tokenizer=None, tokens=None
     
     seq_len = bias_matrix.shape[0]
 
-    # Lấy tokens từ input_ids nếu chưa có
+    # Recover tokens from input_ids when they are not explicitly provided
     if tokens is None:
         if encoded is not None and tokenizer is not None:
             input_ids = encoded.get("input_ids")
             if isinstance(input_ids, torch.Tensor):
-                if input_ids.ndim == 2:  # batch
+                if input_ids.ndim == 2:  # Batch case
                     input_ids = input_ids[0]
                 input_ids = input_ids.detach().cpu().tolist()
             tokens = tokenizer.convert_ids_to_tokens(input_ids)
@@ -38,7 +39,7 @@ def visualize_bias_matrix(bias_matrix, encoded=None, tokenizer=None, tokens=None
     else:
         tokens = tokens[:seq_len]
 
-    # Vẽ heatmap
+    # Draw the heatmap
     plt.figure(figsize=(max(6, seq_len * 0.6), max(6, seq_len * 0.6)))
     sns.heatmap(
         bias_matrix,

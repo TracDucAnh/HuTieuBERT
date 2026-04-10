@@ -9,9 +9,9 @@ from transformers.modeling_outputs import SequenceClassifierOutput
 
 class MorphemeAwareRobertaModel(RobertaModel):
     """
-    PhoBERT mở rộng với:
-    - BoundaryAwareEmbeddings (BMES + gate)
-    - BMES bias hook trên attention head, hỗ trợ batch
+    PhoBERT extended with:
+    - BoundaryAwareEmbeddings (BMES + gating)
+    - A BMES-based attention bias hook with batch support
     """
 
     def __init__(self, config, target_heads=None, alpha=0.1, beta=-0.05, gamma=0.0, delta=0.0, block_bmes_emb = False ,**kwargs):
@@ -37,39 +37,37 @@ class MorphemeAwareRobertaModel(RobertaModel):
 
     def set_bias_matrix(self, bmes_tags):
         """
-        bmes_tags: tensor [B, seq_len] hoặc [seq_len]
-        Trả về tensor [B, num_heads, seq_len, seq_len]
+        bmes_tags: tensor with shape [B, seq_len] or [seq_len]
+        Returns a tensor with shape [B, num_heads, seq_len, seq_len]
         """
         if isinstance(bmes_tags, torch.Tensor) and bmes_tags.dim() == 1:
             bmes_tags = bmes_tags.unsqueeze(0)
 
-        batch_size, seq_len = bmes_tags.shape
         bias_np = create_bias_matrix(bmes_tags, alpha=self.alpha, beta=self.beta, gamma=self.gamma, delta=self.delta)
         bias_tensor = torch.tensor(bias_np, dtype=torch.float32, device=next(self.parameters()).device)
         num_heads = self.config.num_attention_heads
         bias_tensor = bias_tensor.unsqueeze(1).repeat(1, num_heads, 1, 1)
         self.bias_matrix = bias_tensor
 
-    def _create_patched_forward(self, layer_idx, head_indices, original_forward, attn_module):
+    def _create_patched_forward(self, head_indices, attn_module):
         """
-        Tạo forward function mới có cộng bias vào attention scores trước softmax
+        Create a patched forward function that adds the bias to attention
+        scores before the softmax step.
         """
         def patched_forward(
             hidden_states,
             attention_mask=None,
             head_mask=None,
             encoder_hidden_states=None,
-            encoder_attention_mask=None,
             past_key_value=None,
             output_attentions=False,
             **kwargs
         ):
-            batch_size, seq_length = hidden_states.shape[:2]
             
-            # Tính Q, K, V
+            # Compute Q, K, and V
             query_layer = attn_module.query(hidden_states)
             
-            # Xử lý key và value
+            # Process key and value tensors
             is_cross_attention = encoder_hidden_states is not None
             
             if is_cross_attention:
@@ -84,7 +82,7 @@ class MorphemeAwareRobertaModel(RobertaModel):
                 key_layer = attn_module.key(hidden_states)
                 value_layer = attn_module.value(hidden_states)
             
-            # Reshape để split heads
+            # Reshape tensors for multi-head attention
             def split_heads(tensor, num_heads, head_dim):
                 new_shape = tensor.size()[:-1] + (num_heads, head_dim)
                 tensor = tensor.view(new_shape)
@@ -100,13 +98,13 @@ class MorphemeAwareRobertaModel(RobertaModel):
             if hasattr(attn_module, 'is_decoder') and attn_module.is_decoder:
                 past_key_value = (key_layer, value_layer)
             
-            # Tính attention scores
+            # Compute attention scores
             attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
             attention_scores = attention_scores / torch.sqrt(
                 torch.tensor(head_dim, dtype=attention_scores.dtype, device=attention_scores.device)
             )
             
-            # ✅ CỘNG BIAS VÀO ĐÂY - TRƯỚC SOFTMAX
+            # Add the structural bias before applying softmax
             if self.bias_matrix is not None:
                 # print("Adding bias matrix")
                 B, H, L, _ = attention_scores.shape
@@ -130,7 +128,7 @@ class MorphemeAwareRobertaModel(RobertaModel):
             if head_mask is not None:
                 attention_probs = attention_probs * head_mask
             
-            # Tính context layer
+            # Compute the context layer
             context_layer = torch.matmul(attention_probs, value_layer)
             context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
             new_context_layer_shape = context_layer.size()[:-2] + (attn_module.all_head_size,)
@@ -147,7 +145,7 @@ class MorphemeAwareRobertaModel(RobertaModel):
 
     def _patch_attention_layer(self, layer_idx, head_indices):
         """
-        Monkey patch forward method của attention layer
+        Monkey-patch the forward method of the attention layer.
         """
         attn_module = self.encoder.layer[layer_idx].attention.self
         
@@ -156,13 +154,13 @@ class MorphemeAwareRobertaModel(RobertaModel):
             self.patched_forwards[layer_idx] = (attn_module, original_forward)
             
             patched_forward = self._create_patched_forward(
-                layer_idx, head_indices, original_forward, attn_module
+                head_indices, attn_module
             )
             attn_module.forward = patched_forward
 
     def prepare_bias_patches(self):
         """
-        Patch tất cả các layer có target heads
+        Patch all layers that contain target heads.
         """
         self.remove_bias_patches()
         for layer_idx, heads in self.target_heads.items():
@@ -170,7 +168,7 @@ class MorphemeAwareRobertaModel(RobertaModel):
 
     def remove_bias_patches(self):
         """
-        Khôi phục lại original forward methods
+        Restore the original forward methods.
         """
         for layer_idx, (attn_module, original_forward) in self.patched_forwards.items():
             attn_module.forward = original_forward
@@ -189,9 +187,9 @@ class MorphemeAwareRobertaModel(RobertaModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
-        past_key_values_length=0,  # Thêm param này cho embedding layer
+        past_key_values_length=0,  # Extra parameter required by the embedding layer
     ):
-        # Xử lý bmes_ids/bmes_tags
+        # Normalize bmes_ids / bmes_tags inputs
         if bmes_ids is None and bmes_tags is not None:
             bmes_ids = bmes_tags
 
@@ -201,7 +199,7 @@ class MorphemeAwareRobertaModel(RobertaModel):
                 input_ids=input_ids,
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
-                bmes_ids=bmes_ids,  # ✅ Truyền bmes_ids vào embedding
+                bmes_ids=bmes_ids,  # Pass BMES ids into the embedding layer
                 past_key_values_length=past_key_values_length
             )
 
@@ -211,28 +209,28 @@ class MorphemeAwareRobertaModel(RobertaModel):
                 input_ids=input_ids,
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
-                bmes_ids=None,  # ✅ Không truyền BMES, chỉ dùng embedding gốc
+                bmes_ids=None,  # Disable BMES and use only the base embeddings
                 past_key_values_length=past_key_values_length
             )
 
-        # Set bias matrix nếu có bmes_ids
+        # Set the bias matrix when BMES ids are available
         if bmes_ids is not None:
             self.set_bias_matrix(bmes_ids)
 
-        # Patch attention layers nếu có target heads
+        # Patch attention layers when target heads are specified
         if self.target_heads:
             self.prepare_bias_patches()
 
         output_attentions = True if output_attentions is None else output_attentions
 
-        # ✅ Gọi parent forward NHƯNG truyền inputs_embeds thay vì input_ids
+        # Call the parent forward method using inputs_embeds instead of input_ids
         outputs = super().forward(
-            input_ids=None,  # ✅ Set None vì đã có inputs_embeds
+            input_ids=None,  # Use None because inputs_embeds is already provided
             attention_mask=attention_mask,
-            token_type_ids=None,  # ✅ Set None vì đã được xử lý trong embedding
-            position_ids=None,  # ✅ Set None vì đã được xử lý trong embedding
+            token_type_ids=None,  # Use None because token types are handled in embeddings
+            position_ids=None,  # Use None because positions are handled in embeddings
             head_mask=head_mask,
-            inputs_embeds=inputs_embeds,  # ✅ Dùng embedding đã tính
+            inputs_embeds=inputs_embeds,  # Reuse the precomputed embeddings
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -245,8 +243,9 @@ class MorphemeAwareRobertaModel(RobertaModel):
 
 class MorphemeAwareRobertaForMaskedLM(PreTrainedModel):
     """
-    HuTieuBert mở rộng cho Masked Language Modeling.
-    Hỗ trợ bias attention theo BMES và tham số hóa alpha/beta/gamma.
+    HuTieuBERT extension for Masked Language Modeling.
+    Supports BMES-guided attention bias with configurable alpha, beta, gamma,
+    and delta parameters.
     """
     config_class = RobertaConfig
 
@@ -261,7 +260,7 @@ class MorphemeAwareRobertaForMaskedLM(PreTrainedModel):
     ):
         super().__init__(config)
 
-        # Truyền tham số xuống MorphemeAwareRobertaModel
+        # Pass the configuration parameters to MorphemeAwareRobertaModel
         self.roberta = MorphemeAwareRobertaModel(
             config,
             target_heads=target_heads,
@@ -271,10 +270,10 @@ class MorphemeAwareRobertaForMaskedLM(PreTrainedModel):
             delta=delta,
         )
 
-        # Head để dự đoán token bị che
+        # Prediction head for masked tokens
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        # Tie weight: chia sẻ embedding giữa input và output
+        # Tie input and output embedding weights
         self.tie_weights()
         self.init_weights()
 
@@ -296,7 +295,7 @@ class MorphemeAwareRobertaForMaskedLM(PreTrainedModel):
         output_hidden_states=None,
         return_dict=True,
     ):
-        # Forward qua Roberta backbone có BMES bias
+        # Forward pass through the RoBERTa backbone with BMES bias
         outputs = self.roberta(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -314,7 +313,7 @@ class MorphemeAwareRobertaForMaskedLM(PreTrainedModel):
         sequence_output = outputs[0]
         prediction_scores = self.lm_head(sequence_output)
 
-        # Tính loss nếu có label
+        # Compute the loss when labels are provided
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -337,8 +336,8 @@ class MorphemeAwareRobertaForMaskedLM(PreTrainedModel):
 
 class MorphemeAwareRobertaForSequenceClassification(PreTrainedModel):
     """
-    HuTieuBert cho classification tasks.
-    Sử dụng MorphemeAwareRobertaModel làm encoder + classification head.
+    HuTieuBERT for classification tasks.
+    Uses MorphemeAwareRobertaModel as the encoder with a classification head.
     """
     config_class = RobertaConfig
 

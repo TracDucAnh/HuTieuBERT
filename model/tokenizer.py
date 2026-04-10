@@ -6,23 +6,23 @@ from transformers import AutoTokenizer
 
 class MorphemeAwareTokenizer(AutoTokenizer):
     def __init__(self, pretrained_model_name="vinai/phobert-base", vncorenlp_dir='/content/vncorenlp', **kwargs):
-        # Khởi tạo tokenizer HF gốc
+        # Initialize the base Hugging Face tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name, **kwargs)
 
-        # Khởi tạo VnCoreNLP cho word segmentation
+        # Initialize VnCoreNLP for word segmentation
         self.rdrsegmenter = py_vncorenlp.VnCoreNLP(
             annotators=["wseg"],
             save_dir=vncorenlp_dir
         )
 
     def __len__(self):
-        # Trả về vocab size
+        # Return the vocabulary size
         return self.vocab_size
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, vncorenlp_dir='/content/vncorenlp', **kwargs):
         """
-        Load tokenizer từ Hugging Face và giữ logic custom
+        Load the tokenizer from Hugging Face while preserving the custom logic.
         """
         return cls(pretrained_model_name_or_path, vncorenlp_dir=vncorenlp_dir, **kwargs)
     
@@ -48,7 +48,7 @@ class MorphemeAwareTokenizer(AutoTokenizer):
         return self.tokenizer.unk_token
 
     # =============================
-    # ✅ Bổ sung để tương thích với DataCollator
+    # Additional methods for DataCollator compatibility
     # =============================
 
     @property
@@ -73,7 +73,8 @@ class MorphemeAwareTokenizer(AutoTokenizer):
 
     def pad(self, encoded_inputs, padding=True, max_length=None, return_tensors=None, **kwargs):
         """
-        Cho phép DataCollatorForLanguageModeling sử dụng pad() như tokenizer Hugging Face.
+        Allow DataCollatorForLanguageModeling to call pad() as with a standard
+        Hugging Face tokenizer.
         """
         return self.tokenizer.pad(
             encoded_inputs,
@@ -85,8 +86,8 @@ class MorphemeAwareTokenizer(AutoTokenizer):
 
     def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
-        Trả về mask cho special tokens (1 = special token, 0 = normal token).
-        Cần thiết cho DataCollatorForLanguageModeling.
+        Return a mask for special tokens (1 = special token, 0 = normal token).
+        This is required by DataCollatorForLanguageModeling.
         """
         return self.tokenizer.get_special_tokens_mask(
             token_ids_0=token_ids_0,
@@ -96,21 +97,21 @@ class MorphemeAwareTokenizer(AutoTokenizer):
 
     def convert_tokens_to_ids(self, tokens):
         """
-        Chuyển tokens thành IDs. Cần cho một số collator.
+        Convert tokens to IDs. Required by some collators.
         """
         return self.tokenizer.convert_tokens_to_ids(tokens)
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         """
-        Chuyển IDs thành tokens.
+        Convert IDs back to tokens.
         """
         return self.tokenizer.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
 
     def to_bmes(self, text):
         """
-        Tạo danh sách (syllable, BMES-tag) từ text hoặc list[text].
-        Nếu là list -> trả về list[list[(syllable, tag)]]
-        Nếu là str  -> trả về list[(syllable, tag)]
+        Create a list of (syllable, BMES-tag) pairs from text or list[text].
+        If the input is a list, return list[list[(syllable, tag)]].
+        If the input is a string, return list[(syllable, tag)].
         """
         if isinstance(text, list):
             return [self.to_bmes(t) for t in text]
@@ -120,7 +121,7 @@ class MorphemeAwareTokenizer(AutoTokenizer):
 
         segmented = self.rdrsegmenter.word_segment(text)
         
-        # Trường hợp output là list nhiều câu → gộp lại theo từng câu riêng
+        # If the segmenter returns multiple sentences, process them separately
         if isinstance(segmented, list):
             sentences = segmented
         else:
@@ -157,12 +158,12 @@ class MorphemeAwareTokenizer(AutoTokenizer):
 
     def align_bmes_to_subwords(self, bmes_list, subwords_list):
         """
-        Align BMES tags với subwords, xử lý các trường hợp:
-        - Dấu câu dính với chữ (vd: 'c.', '3.')
-        - Ký tự đặc biệt, <unk> tokens
-        - Subword splitting phức tạp
-        
-        🔧 FIX: Xử lý <unk> token bằng cách skip nó và tiếp tục alignment
+        Align BMES tags with subwords while handling:
+        - Punctuation attached to text (for example: 'c.', '3.')
+        - Special characters and <unk> tokens
+        - Complex subword splits
+
+        Fix: handle <unk> tokens by skipping them and continuing alignment.
         """
         aligned_tags = []
         syll_idx = 0
@@ -173,60 +174,60 @@ class MorphemeAwareTokenizer(AutoTokenizer):
         while i < len(subwords_list):
             sub = subwords_list[i]
             
-            # Special tokens - luôn tag là 'S'
+            # Special tokens always receive the 'S' tag
             if sub in ["<s>", "</s>", "<pad>", "<mask>"]:
                 aligned_tags.append("S")
                 i += 1
                 continue
             
-            # 🔧 XỬ LÝ <unk> TOKEN
+            # Handle <unk> tokens
             if sub == "<unk>":
-                # <unk> token là biểu diễn của 1 ký tự không được vocab nhận diện
-                # Gán tag 'S' cho nó và bỏ qua 1 syllable trong bmes_list nếu có
+                # <unk> represents a character not recognized by the vocabulary.
+                # Assign the 'S' tag and skip one syllable in bmes_list if available.
                 aligned_tags.append("S")
                 
-                # Nếu còn syllable, skip nó vì đã được thay thế bằng <unk>
+                # Skip the corresponding syllable because it was replaced by <unk>
                 if syll_idx < len(bmes_list):
                     syll_idx += 1
                 
-                # Reset buffer để tránh cascade errors
+                # Reset the buffer to prevent cascading alignment errors
                 buffer_raw = ""
                 subword_positions = []
                 
                 i += 1
                 continue
             
-            # Hết syllables - tag còn lại là 'S'
+            # If no syllables remain, assign 'S' to the rest
             if syll_idx >= len(bmes_list):
                 aligned_tags.append("S")
                 i += 1
                 continue
             
-            # Lấy syllable hiện tại
+            # Read the current syllable
             syll, tag = bmes_list[syll_idx]
             clean_sub = sub.replace("▁", "").replace("@@", "")
             
-            # Normalize để so sánh
+            # Normalize for comparison
             normalized_syll = self.normalize_text(syll)
             
-            # Case 1: Syllable là dấu câu thuần túy
+            # Case 1: the syllable is pure punctuation
             if self.is_punctuation(syll):
-                # Kiểm tra xem subword có chứa dấu câu này không
+                # Check whether the subword contains this punctuation mark
                 if clean_sub == syll or syll in clean_sub:
                     aligned_tags.append("S")
                     syll_idx += 1
                     i += 1
-                    # Reset buffer nếu đang xử lý
+                    # Reset the buffer if alignment was in progress
                     buffer_raw = ""
                     subword_positions = []
                     continue
             
-            # Case 2: Subword có dấu câu dính (vd: 'c.', 'i.')
-            # Tách phần chữ và dấu câu
+            # Case 2: the subword contains trailing punctuation (for example: 'c.', 'i.')
+            # Split the lexical part and the punctuation part
             word_part = ""
             punct_part = ""
             
-            # Pattern để tách: chữ cái/số ở đầu, dấu câu ở cuối
+            # Match a leading alphanumeric span followed by trailing punctuation
             match = re.match(r'^([a-zA-ZÀ-ỹ0-9]+)([^\w]+)$', clean_sub, re.UNICODE)
             if match:
                 word_part = match.group(1)
@@ -235,17 +236,17 @@ class MorphemeAwareTokenizer(AutoTokenizer):
                 word_part = clean_sub
                 punct_part = ""
             
-            # Xử lý phần chữ
+            # Process the lexical part
             if word_part:
                 buffer_raw += word_part
                 subword_positions.append(len(aligned_tags))
-                aligned_tags.append(tag)  # Tag tạm thời
+                aligned_tags.append(tag)  # Temporary tag assignment
                 
                 normalized_buffer = self.normalize_text(buffer_raw)
                 
-                # Kiểm tra buffer có khớp với syllable chưa
+                # Check whether the buffer now matches the target syllable
                 if normalized_buffer == normalized_syll:
-                    # Gán lại tags đúng cho tất cả subwords trong buffer
+                    # Reassign the correct tags to all subwords in the buffer
                     n = len(subword_positions)
                     if n > 1:
                         if tag == 'B':
@@ -265,18 +266,18 @@ class MorphemeAwareTokenizer(AutoTokenizer):
                     else:
                         aligned_tags[subword_positions[0]] = tag
                     
-                    # Reset buffer và tăng syllable index
+                    # Reset the buffer and advance the syllable pointer
                     buffer_raw = ""
                     subword_positions = []
                     syll_idx += 1
                     
-                    # Xử lý phần dấu câu nếu có
+                    # Process the punctuation part if present
                     if punct_part:
-                        # Kiểm tra syllable tiếp theo có phải dấu câu không
+                        # Check whether the next syllable is punctuation
                         if syll_idx < len(bmes_list):
                             next_syll, next_tag = bmes_list[syll_idx]
                             if self.is_punctuation(next_syll) or next_syll == punct_part:
-                                # Dấu câu này thuộc syllable tiếp theo, không thêm tag
+                                # This punctuation belongs to the next syllable, so do not add a new tag
                                 syll_idx += 1
             
             i += 1
@@ -284,9 +285,9 @@ class MorphemeAwareTokenizer(AutoTokenizer):
         return aligned_tags
 
     def __call__(self, text, **kwargs):
-        # Nếu là list → xử lý batch
+        # If the input is a list, process it as a batch
         if isinstance(text, list):
-            # 1. Tokenize cả batch bằng tokenizer gốc
+            # 1. Tokenize the full batch with the base tokenizer
             encoded = self.tokenizer(
                 text,
                 add_special_tokens=True,
@@ -295,7 +296,7 @@ class MorphemeAwareTokenizer(AutoTokenizer):
                 return_tensors=kwargs.get("return_tensors", None),
             )
 
-            # 2. Tạo BMES tags cho từng câu
+            # 2. Generate BMES tags for each sentence
             BMES_MAP = {"B": 0, "M": 1, "E": 2, "S": 3}
             bmes_tags_list = []
             for i, t in enumerate(text):
@@ -303,12 +304,12 @@ class MorphemeAwareTokenizer(AutoTokenizer):
                 subwords = self.tokenizer.convert_ids_to_tokens(encoded["input_ids"][i].tolist())
                 bmes_tags = self.align_bmes_to_subwords(bmes_list, subwords)
                 
-                # Chuyển sang tensor nếu cần
+                # Convert to a tensor when requested
                 if kwargs.get("return_tensors") == "pt":
                     bmes_tags = torch.tensor([BMES_MAP[tag] for tag in bmes_tags])
                 bmes_tags_list.append(bmes_tags)
 
-            # Padding BMES tags giống input_ids
+            # Pad BMES tags to match the input_ids length
             if kwargs.get("return_tensors") == "pt":
                 max_len = encoded["input_ids"].shape[1]
                 padded_bmes = []
@@ -323,7 +324,7 @@ class MorphemeAwareTokenizer(AutoTokenizer):
 
             return encoded
 
-        # Nếu là string đơn → xử lý như cũ
+        # If the input is a single string, use the single-example path
         bmes_list = self.to_bmes(text)
         encoded = self.tokenizer(text, add_special_tokens=True, **kwargs)
 

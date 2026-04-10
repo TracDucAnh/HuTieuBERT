@@ -1,14 +1,33 @@
-# HuTieuBERT: Morpheme-Aware Transformer for Vietnamese
+<div align="center">
 
-This repository implements a morpheme-aware Transformer architecture that enhances pretrained encoders with explicit morphological structure for isolating languages. 
+# HuTieuBERT
+
+### Morpheme-Aware Transformer for Vietnamese
+
+<p>
+  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-9ACD32?style=for-the-badge"></a>
+  <img alt="Python" src="https://img.shields.io/badge/Python-Research%20Code-3776AB?style=for-the-badge&logo=python&logoColor=white">
+  <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-Deep%20Learning-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white">
+  <img alt="ACL 2026" src="https://img.shields.io/badge/ACL-2026%20Main%20Conference-CB4335?style=for-the-badge&logo=googlescholar&logoColor=white">
+</p>
+
+**News:** Accepted to **ACL 2026 Main Conference**.
+
+**Authors:** Anh Trac Duc Dinh, Khang Hoang Nhat Vo, Tai Tien Ta, Vinh Cong Doan, Tho Quan
+
+*Camera-ready version is not available yet. We will update the paper and citation information after the conference.*
+
+</div>
+
+This repository implements a morpheme-aware Transformer architecture that enhances pretrained encoders with explicit morphological structure for isolating languages.
 
 By introducing two lightweight inductive biases:
 
-- Adaptive Boundary-Token Fusion 
+- Adaptive Boundary-Token Fusion
 
-- Morpheme-Aware Attention Bias.
+- Morpheme-Aware Attention Bias
 
-The model effectively captures compound cohesion and morpheme boundaries that standard Transformers often overlook. While optimized for Vietnamese.
+The model effectively captures compound cohesion and morpheme boundaries that standard Transformers often overlook, while remaining optimized for Vietnamese.
 
 ![Architecture](/figures/ReDrawHuTieuBERT.png)
 
