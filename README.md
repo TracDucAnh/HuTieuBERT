@@ -11,11 +11,9 @@
   <img alt="ACL 2026" src="https://img.shields.io/badge/ACL-2026%20Main%20Conference-CB4335?style=for-the-badge&logo=googlescholar&logoColor=white">
 </p>
 
-**News:** Accepted to **ACL 2026 Main Conference**.
+**News:** Accepted to **ACL 2026 Main Conference**. Paper: [ACL Anthology](https://aclanthology.org/2026.acl-long.472/)
 
 **Authors:** Anh Trac Duc Dinh, Khang Hoang Nhat Vo, Tai Tien Ta, Vinh Cong Doan, Tho Quan
-
-*Camera-ready version is not available yet. We will update the paper and citation information after the conference.*
 
 </div>
 
@@ -82,6 +80,58 @@ By reweighting these connections, the model maintains a stable internal geometry
 
 ![Chi](/figures/machinesebert_attention_1-2_all.png)
 
+## Experimental Results
+
+We compare HuTieuBERT against widely used pretrained BERT-based encoders, including PhoBERT-base, XLM-RoBERTa-base, and mBERT. Although ViWordFormer is closely related in spirit, it is not included in the main comparison due to substantial architectural and pretraining differences: ViWordFormer is a segmentation-free model trained from scratch, whereas HuTieuBERT augments pretrained encoders.
+
+All reported results are mean ± standard deviation across five independent trials with shuffled training data.
+
+### Vietnamese Benchmarks
+
+**Performance on Vietnamese NLP Tasks.**
+
+| Task Type | Dataset | PhoBERT | XLM-RoBERTa | mBERT | HuTieuBERT |
+| --- | --- | ---: | ---: | ---: | ---: |
+| POS (Acc.) | UD\_VTB | 0.9188 ± 0.0093 | 0.7480 ± 0.0115 | 0.8010 ± 0.0076 | **0.9567 ± 0.0031** |
+| POS (Acc.) | VnDT | 0.9465 ± 0.0006 | 0.7613 ± 0.0041 | 0.9224 ± 0.0036 | **0.9875 ± 0.0006** |
+| POS (Acc.) | VLSP\_13 | 0.9601 ± 0.0007 | 0.8674 ± 0.0169 | 0.8651 ± 0.0031 | **0.9654 ± 0.0003** |
+| NER (F1) | PhoNER | 0.8779 ± 0.0038 | 0.8317 ± 0.0110 | 0.6860 ± 0.0068 | **0.8855 ± 0.0011** |
+| NER (F1) | VietMed | 0.5721 ± 0.0111 | **0.6176 ± 0.0021** | 0.4396 ± 0.0163 | 0.5891 ± 0.0089 |
+| NER (F1) | VLSP\_16 | 0.9145 ± 0.0079 | 0.9188 ± 0.0012 | 0.8049 ± 0.0037 | **0.9235 ± 0.0041** |
+| Sent. Ana. (Acc.) | VFSC | 0.8095 ± 0.0294 | 0.7412 ± 0.0167 | 0.6645 ± 0.0589 | **0.8317 ± 0.0134** |
+| Topic Clas. (Acc.) | VFSC | 0.7878 ± 0.0066 | 0.7577 ± 0.0245 | 0.7307 ± 0.0161 | **0.8042 ± 0.0076** |
+| Cons. Det. (Acc.) | ViCTSD | **0.8211 ± 0.0083** | 0.7989 ± 0.0090 | 0.7755 ± 0.0151 | 0.8141 ± 0.0037 |
+| Toxic Det. (Acc.) | ViCTSD | 0.7200 ± 0.0050 | 0.7208 ± 0.0094 | 0.7081 ± 0.0135 | **0.7415 ± 0.0065** |
+
+HuTieuBERT achieves the best POS results across UD\_VTB, VnDT, and VLSP\_13, and also leads on PhoNER and VLSP\_16. On VietMed, XLM-RoBERTa performs best, likely due to the dataset's domain-specific English medical terminology and pronounced class imbalance. For sentence-level classification, HuTieuBERT leads on sentiment, topic classification, and toxic detection, while remaining competitive on constructiveness detection.
+
+### Architecture-Level Ablation
+
+**Performance on POS (Acc.) and NER (F1). Top 3 rows: POS tagging tasks; Bottom 3 rows: NER tasks.**
+
+| Dataset | 1-2 | 5-6 | 9-10 | w\_bias\_1-2 | w\_bmes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| UD\_VTB | **0.9567 ± 0.0031** | 0.9538 ± 0.0007 | 0.9507 ± 0.0046 | 0.9461 ± 0.0008 | 0.9530 ± 0.0005 |
+| VnDT | **0.9873 ± 0.0006** | 0.9868 ± 0.0009 | 0.9871 ± 0.0003 | 0.9788 ± 0.0109 | 0.9832 ± 0.0055 |
+| VLSP\_13 | **0.9654 ± 0.0003** | 0.9633 ± 0.0007 | 0.9642 ± 0.0004 | 0.9617 ± 0.0011 | 0.9634 ± 0.0005 |
+| PhoNER | 0.8855 ± 0.0011 | **0.8869 ± 0.0017** | 0.8860 ± 0.0014 | 0.8847 ± 0.0043 | 0.8860 ± 0.0014 |
+| VietMed | **0.5891 ± 0.0089** | 0.5691 ± 0.0052 | 0.5738 ± 0.0021 | 0.5680 ± 0.0053 | 0.5715 ± 0.0039 |
+| VLSP\_16 | **0.9235 ± 0.0041** | 0.9144 ± 0.0055 | 0.9158 ± 0.0047 | 0.9129 ± 0.0035 | 0.9176 ± 0.0024 |
+
+Early-layer injection at layers 1-2 generally performs best on POS tasks. Removing either structural attention bias or BMES fusion degrades performance, supporting the contribution of both components.
+
+### Transfer to Simplified Chinese
+
+**Transfer to Simplified Chinese: performance on GSDS (POS) and ULNER (NER).**
+
+| Dataset | MAChineseBERT | ChineseBERT |
+| --- | ---: | ---: |
+| GSDS (Acc.) | 0.8158 ± 0.0002 | **0.8249 ± 0.0006** |
+| GSDS (F1) | **0.8316 ± 0.0005** | 0.7816 ± 0.0030 |
+| ULNER (F1) | **0.7571 ± 0.0030** | 0.7440 ± 0.0036 |
+
+On ULNER, MAChineseBERT improves F1 over ChineseBERT by 1.31 percentage points. On GSDS, it slightly trails ChineseBERT in accuracy but improves macro-F1 by 5.00 percentage points, suggesting more balanced predictions across POS categories.
+
 ## Before Running the Code
 
 HuTieuBERT depends on **VnCoreNLP** for Vietnamese word segmentation. Before running any tokenizer or model example in this repository, please download and set up VnCoreNLP following the official repository: [vncorenlp/VnCoreNLP](https://github.com/vncorenlp/VnCoreNLP).
@@ -102,7 +152,6 @@ Notes:
 
 - Java 1.8 or newer is required by VnCoreNLP.
 - Set `vncorenlp_dir` to the same directory you used in `download_model(...)`.
-- The camera-ready paper is not available yet; we will update the README with the final publication details after the conference.
 
 ## Example Usage
 
@@ -155,16 +204,31 @@ model.to(device)
 
 ## Acknowledgement
 
-### Paper (Coming Soon)
+### Paper
 
-The full paper describing our method and experimental results will be released soon. If you find this work useful, please consider citing our paper:
+If you find this work useful, please consider citing our paper:
 
 ```bibtex
-@article{,
-  title   = {Coming Soon},
-  author  = {Coming Soon},
-  journal = {Coming Soon},
-  year    = {Coming Soon},
+@inproceedings{dinh-etal-2026-morphology,
+    title = "When Morphology Hides in Plain Sight: Breaking the Isolation in {V}ietnamese and Beyond",
+    author = "Dinh, Anh Trac Duc  and
+      Vo, Khang Hoang Nhat  and
+      Ta, Tai Tien  and
+      Doan, Vinh Cong  and
+      Quan, Tho",
+    editor = "Liakata, Maria  and
+      Moreira, Viviane P.  and
+      Zhang, Jiajun  and
+      Jurgens, David",
+    booktitle = "Proceedings of the 64th Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2026",
+    address = "San Diego, California, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.acl-long.472/",
+    pages = "10377--10392",
+    ISBN = "979-8-89176-390-6",
+    abstract = "In isolating languages such as Vietnamese, core morphological structure is encoded not by inflection but by the composition and ordering of monosyllabic morphemes, yet standard Transformer encoders largely overlook this signal. We introduce HuTieuBERT, a morpheme-aware Transformer that augments a pretrained Vietnamese encoder with two lightweight inductive biases: (i) Adaptive Boundary-Token Fusion, which integrates BMES-based morpheme boundary embeddings into token representations via a learnable gate, and (ii) a Morpheme-Aware Attention Bias, which injects a fixed structural attention matrix into early self-attention layers while minimally perturbing the pretrained attention geometry. Across a suite of Vietnamese POS, NER, and sentence-level classification benchmarks, HuTieuBERT consistently outperforms strong baselines, with the largest gains on syntactic tasks. Hyperparameter ablations show a broad regime in which structural biases improve accuracy without destabilizing representations. Applying the same design to ChineseBERT (Chinese-BERT-wwm) yields MAChineseBERT, which improves $F_{1}$ and produces more balanced tag distributions on Chinese POS and NER, suggesting that explicit morpheme-aware attention is a portable and effective strategy for modeling isolating languages."
 }
 ```
 

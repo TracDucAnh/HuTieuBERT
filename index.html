@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HuTieuBERT | Morpheme-Aware Transformer for Vietnamese</title>
+  <meta name="description" content="HuTieuBERT: a morpheme-aware Transformer for Vietnamese and other isolating languages, accepted to ACL 2026.">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18221f;
+      --muted: #5d6864;
+      --paper: #fbfaf6;
+      --surface: #ffffff;
+      --line: #d8ddd8;
+      --green: #176b55;
+      --green-soft: #e3f0ea;
+      --red: #b84a3b;
+      --amber: #d89a2b;
+      --cyan: #2a7d8f;
+      --shadow: 0 18px 55px rgba(24, 34, 31, 0.12);
+      --radius: 8px;
+      --page: 1120px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--green);
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.18em;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -4rem;
+      z-index: 20;
+      padding: 0.55rem 0.8rem;
+      color: #fff;
+      background: var(--green);
+      border-radius: var(--radius);
+    }
+
+    .skip-link:focus {
+      top: 1rem;
+    }
+
+    .site-nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid rgba(216, 221, 216, 0.86);
+      background: rgba(251, 250, 246, 0.92);
+      backdrop-filter: blur(16px);
+    }
+
+    .nav-inner {
+      width: min(var(--page), calc(100% - 2rem));
+      min-height: 3.8rem;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      color: var(--ink);
+      font-weight: 800;
+      letter-spacing: 0;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.93rem;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .nav-links a:hover {
+      color: var(--green);
+    }
+
+    .hero {
+      position: relative;
+      min-height: min(760px, 86vh);
+      overflow: hidden;
+      display: grid;
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(90deg, rgba(251, 250, 246, 0.98) 0%, rgba(251, 250, 246, 0.86) 44%, rgba(251, 250, 246, 0.7) 100%),
+        url("figures/ReDrawHuTieuBERT.png") center 56% / min(92rem, 132vw) auto no-repeat,
+        #f5f4ef;
+    }
+
+    .hero-inner {
+      width: min(var(--page), calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 7rem 0 4rem;
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2rem;
+      padding: 0.32rem 0.68rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .pill.accent {
+      border-color: rgba(23, 107, 85, 0.28);
+      background: rgba(227, 240, 234, 0.9);
+      color: var(--green);
+    }
+
+    .hero h1 {
+      max-width: 12ch;
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(3rem, 9vw, 7rem);
+      line-height: 0.92;
+      letter-spacing: 0;
+    }
+
+    .hero-subtitle {
+      max-width: 680px;
+      margin: 1.1rem 0 0;
+      color: #31403b;
+      font-size: clamp(1.2rem, 2.5vw, 1.85rem);
+      line-height: 1.25;
+      font-weight: 720;
+    }
+
+    .authors {
+      max-width: 760px;
+      margin: 1.05rem 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.7rem;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.8rem;
+      padding: 0.72rem 1rem;
+      border: 1px solid var(--green);
+      border-radius: var(--radius);
+      background: var(--green);
+      color: #fff;
+      font-weight: 760;
+      text-decoration: none;
+      box-shadow: 0 10px 24px rgba(23, 107, 85, 0.18);
+    }
+
+    .button.secondary {
+      border-color: var(--line);
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--ink);
+      box-shadow: none;
+    }
+
+    main {
+      width: min(var(--page), calc(100% - 2rem));
+      margin: 0 auto;
+    }
+
+    .section {
+      padding: 4.5rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:last-child {
+      border-bottom: 0;
+    }
+
+    .section-header {
+      max-width: 830px;
+      margin-bottom: 2rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.45rem;
+      color: var(--red);
+      font-size: 0.78rem;
+      font-weight: 850;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 2rem 0 0.75rem;
+      font-size: 1.35rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 1rem;
+    }
+
+    .lead {
+      color: #34433f;
+      font-size: 1.12rem;
+      line-height: 1.65;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0 2.2rem;
+    }
+
+    .feature {
+      padding: 1.15rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 6px 20px rgba(24, 34, 31, 0.05);
+    }
+
+    .feature strong {
+      display: block;
+      margin-bottom: 0.35rem;
+      color: var(--green);
+      font-size: 1rem;
+    }
+
+    .figure {
+      margin: 1.5rem 0 2.5rem;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .figure img {
+      width: 100%;
+    }
+
+    .figure figcaption {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(300px, 1.05fr);
+      gap: 2rem;
+      align-items: start;
+    }
+
+    .compact-list {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: #34433f;
+    }
+
+    .compact-list li {
+      margin: 0.45rem 0;
+    }
+
+    .table-block {
+      margin: 1.2rem 0 2.25rem;
+    }
+
+    .table-caption {
+      margin-bottom: 0.65rem;
+      color: var(--ink);
+      font-weight: 760;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 8px 26px rgba(24, 34, 31, 0.06);
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      font-size: 0.94rem;
+    }
+
+    th,
+    td {
+      padding: 0.78rem 0.8rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--ink);
+      background: #eef5f2;
+      font-size: 0.82rem;
+      font-weight: 830;
+    }
+
+    td.numeric,
+    th.numeric {
+      text-align: right;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .best {
+      color: var(--green);
+      font-weight: 850;
+    }
+
+    .note {
+      color: var(--muted);
+    }
+
+    .callout {
+      margin-top: 1.2rem;
+      padding: 1rem 1.1rem;
+      border-left: 4px solid var(--amber);
+      border-radius: var(--radius);
+      background: #fff8e9;
+      color: #4a3a20;
+    }
+
+    .code-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 0 0 1rem;
+      padding: 1rem;
+      border: 1px solid #273530;
+      border-radius: var(--radius);
+      background: #101816;
+      color: #eaf4ee;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      tab-size: 2;
+    }
+
+    pre code {
+      color: inherit;
+    }
+
+    .setup-card {
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .license-text {
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    footer {
+      padding: 2.5rem 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 860px) {
+      .nav-inner {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 0.8rem 0;
+      }
+
+      .nav-links {
+        gap: 0.7rem;
+      }
+
+      .hero {
+        min-height: 82vh;
+        background:
+          linear-gradient(180deg, rgba(251, 250, 246, 0.97) 0%, rgba(251, 250, 246, 0.86) 52%, rgba(251, 250, 246, 0.78) 100%),
+          url("figures/ReDrawHuTieuBERT.png") center 62% / 58rem auto no-repeat,
+          #f5f4ef;
+      }
+
+      .hero-inner {
+        padding-top: 5rem;
+      }
+
+      .feature-grid,
+      .content-grid,
+      .code-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding: 3.5rem 0;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .nav-links a {
+        font-size: 0.88rem;
+      }
+
+      .hero {
+        min-height: 78vh;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      table {
+        font-size: 0.88rem;
+      }
+
+      th,
+      td {
+        padding: 0.68rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+
+  <nav class="site-nav" aria-label="Primary navigation">
+    <div class="nav-inner">
+      <a class="brand" href="#">HuTieuBERT</a>
+      <div class="nav-links">
+        <a href="#method">Method</a>
+        <a href="#results">Results</a>
+        <a href="#usage">Usage</a>
+        <a href="#citation">Citation</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="status" aria-label="Project badges">
+        <span class="pill accent">ACL 2026 Main Conference</span>
+        <span class="pill">MIT License</span>
+        <span class="pill">Python Research Code</span>
+        <span class="pill">PyTorch Deep Learning</span>
+      </div>
+      <h1>HuTieuBERT</h1>
+      <p class="hero-subtitle">Morpheme-Aware Transformer for Vietnamese</p>
+      <p class="authors">
+        Anh Trac Duc Dinh, Khang Hoang Nhat Vo, Tai Tien Ta, Vinh Cong Doan, Tho Quan
+      </p>
+      <div class="actions">
+        <a class="button" href="https://aclanthology.org/2026.acl-long.472/">ACL Anthology</a>
+        <a class="button secondary" href="#citation">BibTeX</a>
+        <a class="button secondary" href="README.md">README</a>
+        <a class="button secondary" href="LICENSE">License</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="content">
+    <section class="section" id="overview">
+      <div class="section-header">
+        <p class="eyebrow">Overview</p>
+        <h2>Explicit morphology for isolating languages.</h2>
+      </div>
+      <p class="lead">
+        This repository implements a morpheme-aware Transformer architecture that enhances pretrained encoders with explicit morphological structure for isolating languages.
+      </p>
+      <div class="feature-grid">
+        <div class="feature">
+          <strong>Adaptive Boundary-Token Fusion</strong>
+          <p>Integrates BMES-based morpheme boundary embeddings into token representations through a learnable gate.</p>
+        </div>
+        <div class="feature">
+          <strong>Morpheme-Aware Attention Bias</strong>
+          <p>Injects a fixed structural attention matrix into early self-attention layers while minimally perturbing pretrained attention geometry.</p>
+        </div>
+      </div>
+      <p>
+        The model effectively captures compound cohesion and morpheme boundaries that standard Transformers often overlook, while remaining optimized for Vietnamese.
+      </p>
+      <figure class="figure">
+        <img src="figures/ReDrawHuTieuBERT.png" alt="HuTieuBERT architecture diagram">
+        <figcaption>HuTieuBERT architecture.</figcaption>
+      </figure>
+      <p>
+        The design is portable to other isolating languages like Mandarin Chinese, consistently improving performance on syntactic tasks such as POS tagging and Named Entity Recognition (NER).
+      </p>
+    </section>
+
+    <section class="section" id="method">
+      <div class="section-header">
+        <p class="eyebrow">Method</p>
+        <h2>Boundary fusion and structural attention.</h2>
+      </div>
+
+      <div class="content-grid">
+        <div>
+          <h3>Adaptive Boundary-Token Fusion</h3>
+          <p>
+            Subword alignment syncs word-structure tags (BMES) with the smaller sub-units of text created during tokenization.
+          </p>
+          <ul class="compact-list">
+            <li><strong>B (Begin):</strong> Marks the first syllable or character of a multi-syllable word.</li>
+            <li><strong>M (Middle):</strong> Applied to the internal syllables or characters of a multi-syllable word.</li>
+            <li><strong>E (End):</strong> Marks the final syllable or character of a multi-syllable word.</li>
+            <li><strong>S (Single):</strong> Used for standalone words that consist of only one syllable or character.</li>
+          </ul>
+          <p>
+            By expanding these tags, the model ensures that multi-syllable words keep their linguistic meaning even when broken into pieces.
+          </p>
+        </div>
+        <figure class="figure">
+          <img src="figures/alignment.png" alt="BMES subword alignment diagram">
+          <figcaption>Subword alignment.</figcaption>
+        </figure>
+      </div>
+
+      <div class="content-grid">
+        <div>
+          <h3>Adaptive Interpolation Layer</h3>
+          <ul class="compact-list">
+            <li><strong>Blending Information:</strong> Combines standard word data with boundary information that marks where words start and end.</li>
+            <li><strong>Smart Filtering:</strong> A gate automatically decides how much boundary information is needed for each word based on its context.</li>
+            <li><strong>Rich Representation:</strong> The result is a more complete representation of the text that respects the natural boundaries of the language.</li>
+          </ul>
+        </div>
+        <figure class="figure">
+          <img src="figures/embeddings.png" alt="Adaptive Boundary-Token Fusion embedding diagram">
+          <figcaption>Adaptive Boundary-Token Fusion.</figcaption>
+        </figure>
+      </div>
+
+      <h3>Morpheme-Aware Attention Bias</h3>
+      <p>
+        This module guides the model's focus by injecting a fixed structural prior into the early self-attention layers. It ensures that the attention mass respects the natural boundaries of compounds rather than spreading too thin across unrelated words.
+      </p>
+      <figure class="figure">
+        <img src="figures/multi_layer_attention_1-2_all.png" alt="Vietnamese attention visualization across early layers">
+        <figcaption>Vietnamese morpheme-aware attention visualization.</figcaption>
+      </figure>
+      <p>The bias is controlled by a matrix using four key parameters to modulate relationship scores:</p>
+      <ul class="compact-list">
+        <li><strong>Alpha (&alpha;):</strong> Strengthens focus between tokens that belong to the same compound phrase.</li>
+        <li><strong>Beta (&beta;):</strong> Penalizes or mutes attention between tokens that belong to different compounds.</li>
+        <li><strong>Gamma (&gamma;):</strong> Highlights and adjusts the importance of single-word units.</li>
+        <li><strong>Delta (&delta;):</strong> Controls the strength of a token's focus on itself, or self-attention bias.</li>
+      </ul>
+      <p>
+        By reweighting these connections, the model maintains a stable internal geometry while gaining a clearer understanding of linguistic structure. This method not only work with Vietnamese but also other isolating languages like Mandarin Chinese and Thai.
+      </p>
+      <figure class="figure">
+        <img src="figures/machinesebert_attention_1-2_all.png" alt="Chinese morpheme-aware attention visualization across early layers">
+        <figcaption>Chinese morpheme-aware attention visualization.</figcaption>
+      </figure>
+    </section>
+
+    <section class="section" id="results">
+      <div class="section-header">
+        <p class="eyebrow">Experimental Results</p>
+        <h2>Strong gains on Vietnamese syntactic tasks.</h2>
+      </div>
+      <p>
+        We compare HuTieuBERT against widely used pretrained BERT-based encoders, including PhoBERT-base, XLM-RoBERTa-base, and mBERT. Although ViWordFormer is closely related in spirit, it is not included in the main comparison due to substantial architectural and pretraining differences: ViWordFormer is a segmentation-free model trained from scratch, whereas HuTieuBERT augments pretrained encoders.
+      </p>
+      <p class="note">All reported results are mean &plusmn; standard deviation across five independent trials with shuffled training data.</p>
+
+      <div class="table-block">
+        <p class="table-caption">Performance on Vietnamese NLP Tasks.</p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Task Type</th>
+                <th>Dataset</th>
+                <th class="numeric">PhoBERT</th>
+                <th class="numeric">XLM-RoBERTa</th>
+                <th class="numeric">mBERT</th>
+                <th class="numeric">HuTieuBERT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>POS (Acc.)</td>
+                <td>UD_VTB</td>
+                <td class="numeric">0.9188 &plusmn; 0.0093</td>
+                <td class="numeric">0.7480 &plusmn; 0.0115</td>
+                <td class="numeric">0.8010 &plusmn; 0.0076</td>
+                <td class="numeric best">0.9567 &plusmn; 0.0031</td>
+              </tr>
+              <tr>
+                <td>POS (Acc.)</td>
+                <td>VnDT</td>
+                <td class="numeric">0.9465 &plusmn; 0.0006</td>
+                <td class="numeric">0.7613 &plusmn; 0.0041</td>
+                <td class="numeric">0.9224 &plusmn; 0.0036</td>
+                <td class="numeric best">0.9875 &plusmn; 0.0006</td>
+              </tr>
+              <tr>
+                <td>POS (Acc.)</td>
+                <td>VLSP_13</td>
+                <td class="numeric">0.9601 &plusmn; 0.0007</td>
+                <td class="numeric">0.8674 &plusmn; 0.0169</td>
+                <td class="numeric">0.8651 &plusmn; 0.0031</td>
+                <td class="numeric best">0.9654 &plusmn; 0.0003</td>
+              </tr>
+              <tr>
+                <td>NER (F1)</td>
+                <td>PhoNER</td>
+                <td class="numeric">0.8779 &plusmn; 0.0038</td>
+                <td class="numeric">0.8317 &plusmn; 0.0110</td>
+                <td class="numeric">0.6860 &plusmn; 0.0068</td>
+                <td class="numeric best">0.8855 &plusmn; 0.0011</td>
+              </tr>
+              <tr>
+                <td>NER (F1)</td>
+                <td>VietMed</td>
+                <td class="numeric">0.5721 &plusmn; 0.0111</td>
+                <td class="numeric best">0.6176 &plusmn; 0.0021</td>
+                <td class="numeric">0.4396 &plusmn; 0.0163</td>
+                <td class="numeric">0.5891 &plusmn; 0.0089</td>
+              </tr>
+              <tr>
+                <td>NER (F1)</td>
+                <td>VLSP_16</td>
+                <td class="numeric">0.9145 &plusmn; 0.0079</td>
+                <td class="numeric">0.9188 &plusmn; 0.0012</td>
+                <td class="numeric">0.8049 &plusmn; 0.0037</td>
+                <td class="numeric best">0.9235 &plusmn; 0.0041</td>
+              </tr>
+              <tr>
+                <td>Sent. Ana. (Acc.)</td>
+                <td>VFSC</td>
+                <td class="numeric">0.8095 &plusmn; 0.0294</td>
+                <td class="numeric">0.7412 &plusmn; 0.0167</td>
+                <td class="numeric">0.6645 &plusmn; 0.0589</td>
+                <td class="numeric best">0.8317 &plusmn; 0.0134</td>
+              </tr>
+              <tr>
+                <td>Topic Clas. (Acc.)</td>
+                <td>VFSC</td>
+                <td class="numeric">0.7878 &plusmn; 0.0066</td>
+                <td class="numeric">0.7577 &plusmn; 0.0245</td>
+                <td class="numeric">0.7307 &plusmn; 0.0161</td>
+                <td class="numeric best">0.8042 &plusmn; 0.0076</td>
+              </tr>
+              <tr>
+                <td>Cons. Det. (Acc.)</td>
+                <td>ViCTSD</td>
+                <td class="numeric best">0.8211 &plusmn; 0.0083</td>
+                <td class="numeric">0.7989 &plusmn; 0.0090</td>
+                <td class="numeric">0.7755 &plusmn; 0.0151</td>
+                <td class="numeric">0.8141 &plusmn; 0.0037</td>
+              </tr>
+              <tr>
+                <td>Toxic Det. (Acc.)</td>
+                <td>ViCTSD</td>
+                <td class="numeric">0.7200 &plusmn; 0.0050</td>
+                <td class="numeric">0.7208 &plusmn; 0.0094</td>
+                <td class="numeric">0.7081 &plusmn; 0.0135</td>
+                <td class="numeric best">0.7415 &plusmn; 0.0065</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p>
+        HuTieuBERT achieves the best POS results across UD_VTB, VnDT, and VLSP_13, and also leads on PhoNER and VLSP_16. On VietMed, XLM-RoBERTa performs best, likely due to the dataset's domain-specific English medical terminology and pronounced class imbalance. For sentence-level classification, HuTieuBERT leads on sentiment, topic classification, and toxic detection, while remaining competitive on constructiveness detection.
+      </p>
+
+      <div class="table-block">
+        <p class="table-caption">Performance on POS (Acc.) and NER (F1). Top 3 rows: POS tagging tasks; Bottom 3 rows: NER tasks.</p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Dataset</th>
+                <th class="numeric">1-2</th>
+                <th class="numeric">5-6</th>
+                <th class="numeric">9-10</th>
+                <th class="numeric">w_bias_1-2</th>
+                <th class="numeric">w_bmes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>UD_VTB</td>
+                <td class="numeric best">0.9567 &plusmn; 0.0031</td>
+                <td class="numeric">0.9538 &plusmn; 0.0007</td>
+                <td class="numeric">0.9507 &plusmn; 0.0046</td>
+                <td class="numeric">0.9461 &plusmn; 0.0008</td>
+                <td class="numeric">0.9530 &plusmn; 0.0005</td>
+              </tr>
+              <tr>
+                <td>VnDT</td>
+                <td class="numeric best">0.9873 &plusmn; 0.0006</td>
+                <td class="numeric">0.9868 &plusmn; 0.0009</td>
+                <td class="numeric">0.9871 &plusmn; 0.0003</td>
+                <td class="numeric">0.9788 &plusmn; 0.0109</td>
+                <td class="numeric">0.9832 &plusmn; 0.0055</td>
+              </tr>
+              <tr>
+                <td>VLSP_13</td>
+                <td class="numeric best">0.9654 &plusmn; 0.0003</td>
+                <td class="numeric">0.9633 &plusmn; 0.0007</td>
+                <td class="numeric">0.9642 &plusmn; 0.0004</td>
+                <td class="numeric">0.9617 &plusmn; 0.0011</td>
+                <td class="numeric">0.9634 &plusmn; 0.0005</td>
+              </tr>
+              <tr>
+                <td>PhoNER</td>
+                <td class="numeric">0.8855 &plusmn; 0.0011</td>
+                <td class="numeric best">0.8869 &plusmn; 0.0017</td>
+                <td class="numeric">0.8860 &plusmn; 0.0014</td>
+                <td class="numeric">0.8847 &plusmn; 0.0043</td>
+                <td class="numeric">0.8860 &plusmn; 0.0014</td>
+              </tr>
+              <tr>
+                <td>VietMed</td>
+                <td class="numeric best">0.5891 &plusmn; 0.0089</td>
+                <td class="numeric">0.5691 &plusmn; 0.0052</td>
+                <td class="numeric">0.5738 &plusmn; 0.0021</td>
+                <td class="numeric">0.5680 &plusmn; 0.0053</td>
+                <td class="numeric">0.5715 &plusmn; 0.0039</td>
+              </tr>
+              <tr>
+                <td>VLSP_16</td>
+                <td class="numeric best">0.9235 &plusmn; 0.0041</td>
+                <td class="numeric">0.9144 &plusmn; 0.0055</td>
+                <td class="numeric">0.9158 &plusmn; 0.0047</td>
+                <td class="numeric">0.9129 &plusmn; 0.0035</td>
+                <td class="numeric">0.9176 &plusmn; 0.0024</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p>
+        Early-layer injection at layers 1-2 generally performs best on POS tasks. Removing either structural attention bias or BMES fusion degrades performance, supporting the contribution of both components.
+      </p>
+
+      <div class="table-block">
+        <p class="table-caption">Transfer to Simplified Chinese: performance on GSDS (POS) and ULNER (NER).</p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Dataset</th>
+                <th class="numeric">MAChineseBERT</th>
+                <th class="numeric">ChineseBERT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>GSDS (Acc.)</td>
+                <td class="numeric">0.8158 &plusmn; 0.0002</td>
+                <td class="numeric best">0.8249 &plusmn; 0.0006</td>
+              </tr>
+              <tr>
+                <td>GSDS (F1)</td>
+                <td class="numeric best">0.8316 &plusmn; 0.0005</td>
+                <td class="numeric">0.7816 &plusmn; 0.0030</td>
+              </tr>
+              <tr>
+                <td>ULNER (F1)</td>
+                <td class="numeric best">0.7571 &plusmn; 0.0030</td>
+                <td class="numeric">0.7440 &plusmn; 0.0036</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p>
+        On ULNER, MAChineseBERT improves F1 over ChineseBERT by 1.31 percentage points. On GSDS, it slightly trails ChineseBERT in accuracy but improves macro-F1 by 5.00 percentage points, suggesting more balanced predictions across POS categories.
+      </p>
+    </section>
+
+    <section class="section" id="usage">
+      <div class="section-header">
+        <p class="eyebrow">Usage</p>
+        <h2>Before running the code.</h2>
+      </div>
+      <p>
+        HuTieuBERT depends on <strong>VnCoreNLP</strong> for Vietnamese word segmentation. Before running any tokenizer or model example in this repository, please download and set up VnCoreNLP following the official repository: <a href="https://github.com/vncorenlp/VnCoreNLP">vncorenlp/VnCoreNLP</a>.
+      </p>
+
+      <div class="code-grid">
+        <div class="setup-card">
+          <h3>Recommended setup</h3>
+          <pre><code>pip install py_vncorenlp</code></pre>
+          <pre><code>import py_vncorenlp
+
+py_vncorenlp.download_model(save_dir="/absolute/path/to/vncorenlp")</code></pre>
+        </div>
+        <div class="setup-card">
+          <h3>Notes</h3>
+          <ul class="compact-list">
+            <li>Java 1.8 or newer is required by VnCoreNLP.</li>
+            <li>Set <code>vncorenlp_dir</code> to the same directory you used in <code>download_model(...)</code>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Example Usage</h3>
+      <pre><code>import torch
+import torch.nn as nn
+from transformers.models.roberta.modeling_roberta import RobertaModel, RobertaEncoder, RobertaLayer
+from transformers import RobertaConfig
+
+from model.tokenizer import MorphemeAwareTokenizer
+from model.embeddings import BoundaryAwareEmbeddings
+from model.model import MorphemeAwareRobertaModel, MorphemeAwareRobertaForSequenceClassification
+
+tokenizer = MorphemeAwareTokenizer.from_pretrained(
+    "ducanhdinh/HuTieuBert",
+    vncorenlp_dir="/content/vncorenlp",
+    return_tensors="pt"
+)
+
+config = RobertaConfig.from_pretrained("ducanhdinh/HuTieuBert")
+
+# Applied Structural Bias Matrix to Layer 1 and 2 full 12 heads
+target_heads = {
+    1: list(range(config.num_attention_heads)),
+    2: list(range(config.num_attention_heads)),
+}
+
+model = MorphemeAwareRobertaForSequenceClassification(
+    config,
+    num_labels=label_num,
+    target_heads=target_heads,
+    alpha=0.5,
+    beta=-0.3,
+    gamma=0.0,
+    delta=0.0,
+)
+
+model.roberta = MorphemeAwareRobertaModel.from_pretrained(
+    "ducanhdinh/HuTieuBert",
+    target_heads=target_heads,
+    alpha=0.5,
+    beta=-0.3,
+    gamma=0.0,
+    delta=0.0,
+)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)</code></pre>
+    </section>
+
+    <section class="section" id="citation">
+      <div class="section-header">
+        <p class="eyebrow">Citation</p>
+        <h2>Paper and BibTeX.</h2>
+      </div>
+      <p>If you find this work useful, please consider citing our paper:</p>
+      <pre><code>@inproceedings{dinh-etal-2026-morphology,
+    title = "When Morphology Hides in Plain Sight: Breaking the Isolation in {V}ietnamese and Beyond",
+    author = "Dinh, Anh Trac Duc  and
+      Vo, Khang Hoang Nhat  and
+      Ta, Tai Tien  and
+      Doan, Vinh Cong  and
+      Quan, Tho",
+    editor = "Liakata, Maria  and
+      Moreira, Viviane P.  and
+      Zhang, Jiajun  and
+      Jurgens, David",
+    booktitle = "Proceedings of the 64th Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2026",
+    address = "San Diego, California, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.acl-long.472/",
+    pages = "10377--10392",
+    ISBN = "979-8-89176-390-6",
+    abstract = "In isolating languages such as Vietnamese, core morphological structure is encoded not by inflection but by the composition and ordering of monosyllabic morphemes, yet standard Transformer encoders largely overlook this signal. We introduce HuTieuBERT, a morpheme-aware Transformer that augments a pretrained Vietnamese encoder with two lightweight inductive biases: (i) Adaptive Boundary-Token Fusion, which integrates BMES-based morpheme boundary embeddings into token representations via a learnable gate, and (ii) a Morpheme-Aware Attention Bias, which injects a fixed structural attention matrix into early self-attention layers while minimally perturbing the pretrained attention geometry. Across a suite of Vietnamese POS, NER, and sentence-level classification benchmarks, HuTieuBERT consistently outperforms strong baselines, with the largest gains on syntactic tasks. Hyperparameter ablations show a broad regime in which structural biases improve accuracy without destabilizing representations. Applying the same design to ChineseBERT (Chinese-BERT-wwm) yields MAChineseBERT, which improves $F_{1}$ and produces more balanced tag distributions on Chinese POS and NER, suggesting that explicit morpheme-aware attention is a portable and effective strategy for modeling isolating languages."
+}</code></pre>
+    </section>
+
+    <section class="section" id="acknowledgement">
+      <div class="section-header">
+        <p class="eyebrow">Acknowledgement</p>
+        <h2>Use of external segmentation.</h2>
+      </div>
+      <p>
+        This work makes use of <strong>VnCoreNLP</strong> - a Vietnamese natural language processing toolkit.
+      </p>
+      <div class="callout license-text">
+        <p>Copyright (C) 2018-2019 VnCoreNLP</p>
+        <p>
+          This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+        </p>
+        <p>
+          This program is distributed in the hope that it will be useful, but <strong>WITHOUT ANY WARRANTY</strong>; without even the implied warranty of <strong>MERCHANTABILITY</strong> or <strong>FITNESS FOR A PARTICULAR PURPOSE</strong>. See the <a href="https://www.gnu.org/licenses/">GNU General Public License</a> for more details.
+        </p>
+        <p>Repository: <a href="https://github.com/vncorenlp/VnCoreNLP">https://github.com/vncorenlp/VnCoreNLP</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    HuTieuBERT · Morpheme-Aware Transformer for Vietnamese · ACL 2026
+  </footer>
+</body>
+</html>
