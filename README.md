@@ -11,7 +11,7 @@
   <img alt="ACL 2026" src="https://img.shields.io/badge/ACL-2026%20Main%20Conference-CB4335?style=for-the-badge&logo=googlescholar&logoColor=white">
 </p>
 
-**News:** Accepted to **ACL 2026 Main Conference**. Paper: [ACL Anthology](https://aclanthology.org/2026.acl-long.472/)
+**News:** Accepted to **ACL 2026 Main Conference**. Paper: [ACL Anthology](https://aclanthology.org/2026.acl-long.472/). Project page: [Link](https://tracducanh.github.io/HuTieuBERT/)
 
 **Authors:** Anh Trac Duc Dinh, Khang Hoang Nhat Vo, Tai Tien Ta, Vinh Cong Doan, Tho Quan
 
